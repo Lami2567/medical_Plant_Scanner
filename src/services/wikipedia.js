@@ -17,6 +17,9 @@ async function fetchPlantKnowledge(plantName) {
       format: 'json',
       srlimit: 3,
     },
+    headers: {
+      'User-Agent': 'MedPlantScanner/1.0 (https://github.com/Lami2567/medical_Plant_Scanner; contact@example.com)'
+    },
     timeout: 15000,
   });
 
@@ -39,6 +42,7 @@ async function fetchPlantKnowledge(plantName) {
       format: 'json',
     },
     timeout: 15000,
+    headers: { 'User-Agent': 'MedPlantScanner/1.0 (contact@example.com)' }
   });
 
   const pages = pageRes.data?.query?.pages;
