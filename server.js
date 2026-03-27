@@ -9,7 +9,7 @@ const fs = require('fs');
 const plantRoutes = require('./src/routes/plant');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 
 // ─── Security Middleware ────────────────────────────────────────────────────
 app.use(helmet());
