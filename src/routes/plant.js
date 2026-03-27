@@ -7,8 +7,10 @@ const sharp = require('sharp');
 const router = express.Router();
 const pool = require('../db/postgres');
 const { identifyPlant } = require('../services/plantnet');
-const { fetchPlantKnowledge } = require('../services/wikipedia');
-const { processPlantData } = require('../services/textProcessor');
+const { normalizePlantName } = require('../services/mpns');
+const { fetchPfafData } = require('../services/pfaf');
+const { fetchPerenualData } = require('../services/perenual');
+const { mergePlantData } = require('../services/textProcessor');
 
 // ─── Multer Config ───────────────────────────────────────────────────────────
 const MAX_SIZE_MB = parseInt(process.env.MAX_IMAGE_SIZE_MB || '10');
@@ -66,6 +68,24 @@ function cleanup(filePath) {
   }
 }
 
+/**
+ * Orchestrates multi-source RAG retrieval.
+ */
+async function getMultiSourceKnowledge(commonName, scientificName) {
+  console.log(`[RAG] Fetching knowledge for ${commonName} (${scientificName})...`);
+  
+  // Normalize via MPNS if needed
+  const normalized = await normalizePlantName(scientificName || commonName);
+  
+  // Parallel fetch from authoritative sources
+  const [pfaf, perenual] = await Promise.all([
+    fetchPfafData(normalized.resolvedName),
+    fetchPerenualData(commonName)
+  ]);
+
+  return mergePlantData(commonName, scientificName, [pfaf, perenual]);
+}
+
 // ─── POST /scan-plant ─────────────────────────────────────────────────────────
 router.post('/scan-plant', (req, res, next) => {
   upload.single('image')(req, res, async (err) => {
@@ -85,7 +105,6 @@ router.post('/scan-plant', (req, res, next) => {
         return res.status(400).json({ error: 'No image provided. Include an image file in the "image" field.' });
       }
 
-      // Optionally compress image using sharp (resize to max 1024px wide)
       const compressedPath = imagePath.replace(/(\.\w+)$/, '_compressed.jpg');
       await sharp(imagePath)
         .resize({ width: 1024, withoutEnlargement: true })
@@ -106,19 +125,14 @@ router.post('/scan-plant', (req, res, next) => {
         return res.json({ ...cached, confidence_score: identified.confidence, from_cache: true });
       }
 
-      // Step 3: Fetch Wikipedia knowledge (RAG)
-      console.log('[SCAN] Fetching Wikipedia knowledge...');
-      const wikiData = await fetchPlantKnowledge(identified.name);
-
-      // Step 4: Process into structured JSON
-      const plantData = processPlantData(identified.name, identified.scientificName, wikiData);
+      // Step 3: Multi-Source RAG
+      const plantData = await getMultiSourceKnowledge(identified.name, identified.scientificName);
       plantData.confidence_score = identified.confidence;
       plantData.from_cache = false;
 
-      // Step 5: Save to DB
+      // Step 4: Save to DB
       await savePlantToDB(identified.name, identified.scientificName, plantData);
 
-      // Cleanup temp files
       cleanup(imagePath);
       cleanup(compressedPath);
 
@@ -126,14 +140,9 @@ router.post('/scan-plant', (req, res, next) => {
     } catch (error) {
       cleanup(imagePath);
       console.error('[SCAN ERROR]', error.message);
-
-      // Determine if this is a user-facing error
-      const userFacingErrors = [
-        'not recognized', 'confidence', 'PlantNet API', 'file type', 'too large',
-      ];
-      const isUserFacing = userFacingErrors.some((kw) =>
-        error.message.toLowerCase().includes(kw.toLowerCase())
-      );
+      
+      const userFacingErrors = ['not recognized', 'confidence', 'PlantNet API', 'file type', 'too large'];
+      const isUserFacing = userFacingErrors.some((kw) => error.message.toLowerCase().includes(kw));
 
       return res.status(isUserFacing ? 400 : 500).json({ error: error.message });
     }
@@ -143,28 +152,18 @@ router.post('/scan-plant', (req, res, next) => {
 // ─── GET /plant/:name ─────────────────────────────────────────────────────────
 router.get('/plant/:name', async (req, res) => {
   const plantName = req.params.name?.trim();
-  if (!plantName) {
-    return res.status(400).json({ error: 'Plant name is required.' });
-  }
+  if (!plantName) return res.status(400).json({ error: 'Plant name is required.' });
 
   try {
-    // Check DB cache first
     const cached = await getPlantFromDB(plantName);
-    if (cached) {
-      return res.json({ ...cached, from_cache: true });
-    }
+    if (cached) return res.json({ ...cached, from_cache: true });
 
-    // Not in cache → fetch live
     console.log(`[GET] Fetching live data for: ${plantName}`);
-    const wikiData = await fetchPlantKnowledge(plantName);
-    if (!wikiData) {
-      return res.status(404).json({ error: `No information found for "${plantName}".` });
-    }
-
-    const plantData = processPlantData(plantName, null, wikiData);
+    const plantData = await getMultiSourceKnowledge(plantName, null);
+    
     await savePlantToDB(plantName, null, plantData);
-
     plantData.from_cache = false;
+    
     return res.json(plantData);
   } catch (error) {
     console.error('[GET ERROR]', error.message);
@@ -173,3 +172,4 @@ router.get('/plant/:name', async (req, res) => {
 });
 
 module.exports = router;
+
