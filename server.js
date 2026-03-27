@@ -11,6 +11,9 @@ const plantRoutes = require('./src/routes/plant');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
+// Trust the proxy (Koyeb load balancer) for accurate IP-based rate limiting
+app.set('trust proxy', 1);
+
 // ─── Security Middleware ────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors());
