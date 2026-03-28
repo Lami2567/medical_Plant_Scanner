@@ -10,6 +10,8 @@ const { identifyPlant } = require('../services/plantnet');
 const { normalizePlantName } = require('../services/mpns');
 const { fetchPfafData } = require('../services/pfaf');
 const { fetchPerenualData } = require('../services/perenual');
+const { fetchProtaData } = require('../services/prota');
+const { fetchPreludeData } = require('../services/prelude');
 const { mergePlantData } = require('../services/textProcessor');
 
 // ─── Multer Config ───────────────────────────────────────────────────────────
@@ -74,16 +76,18 @@ function cleanup(filePath) {
 async function getMultiSourceKnowledge(commonName, scientificName) {
   console.log(`[RAG] Fetching knowledge for ${commonName} (${scientificName})...`);
   
-  // Normalize via MPNS if needed
+  // Normalize via MPNS
   const normalized = await normalizePlantName(scientificName || commonName);
   
   // Parallel fetch from authoritative sources
-  const [pfaf, perenual] = await Promise.all([
-    fetchPfafData(normalized.resolvedName),
-    fetchPerenualData(commonName)
+  const [pfaf, perenual, prota, prelude] = await Promise.all([
+    fetchPfafData(normalized.resolvedName).catch(() => null),
+    fetchPerenualData(scientificName || commonName).catch(() => null),
+    fetchProtaData(scientificName || commonName).catch(() => null),
+    fetchPreludeData(scientificName || commonName).catch(() => null)
   ]);
 
-  return mergePlantData(commonName, scientificName, [pfaf, perenual]);
+  return mergePlantData(commonName, scientificName, [pfaf, perenual, prota, prelude]);
 }
 
 // ─── POST /scan-plant ─────────────────────────────────────────────────────────

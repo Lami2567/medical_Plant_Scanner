@@ -5,9 +5,9 @@
 
 // ─── Trust Scores ────────────────────────────────────────────────────────────
 const TRUST_SCORES = {
-  'HerbMed': 0.9,
+  'PROTA (Plant Resources of Tropical Africa)': 0.95,
+  'Prelude Medicinal Plants Database': 0.9,
   'Plants For A Future (PFAF)': 0.8,
-  'Prelude': 0.7,
   'Perenual API': 0.6,
 };
 
