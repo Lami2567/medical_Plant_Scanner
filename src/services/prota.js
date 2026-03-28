@@ -8,29 +8,9 @@ const cheerio = require('cheerio');
 async function fetchProtaData(scientificName) {
   try {
     const query = scientificName.replace(' ', '+');
-    // Search URL
-    const searchUrl = `https://prota.prota4u.org/searchresults.asp?allfield=${query}`;
+    // Direct Article URL
+    const articleUrl = `https://prota.prota4u.org/protav8.asp?p=${query}`;
     
-    console.log(`[PROTA] Searching for: ${scientificName}`);
-    
-    const { data: searchHtml } = await axios.get(searchUrl, {
-      headers: { 'User-Agent': 'MedPlantScanner/1.0' },
-      timeout: 10000
-    });
-    
-    const $search = cheerio.load(searchHtml);
-    
-    // Find the first result link. PROTA results are often in a table or list.
-    // Looking for a link that goes to protav8.asp (the article viewer)
-    const firstResult = $search('a[href*="protav8.asp"]').first();
-    const relativeUrl = firstResult.attr('href');
-    
-    if (!relativeUrl) {
-      console.log(`[PROTA] No article found for: ${scientificName}`);
-      return null;
-    }
-    
-    const articleUrl = `https://prota.prota4u.org/${relativeUrl}`;
     console.log(`[PROTA] Fetching article: ${articleUrl}`);
     
     const { data: articleHtml } = await axios.get(articleUrl, {
@@ -40,24 +20,39 @@ async function fetchProtaData(scientificName) {
     
     const $ = cheerio.load(articleHtml);
     
-    // PROTA sections are usually inside specific headers or labels
-    // We'll look for "Uses" or "Medicinal uses"
+    // Helper to extract text from improperly nested PROTA tables
+    function extractText(html, name) {
+      const marker = `<a name=${name}></a>${name}`;
+      let parts = html.split(marker);
+      if (parts.length < 2) return null;
+      
+      let section = parts[1];
+      let startMarker = '<td colspan=3>';
+      let startIdx = section.indexOf(startMarker);
+      if (startIdx === -1) return null;
+      
+      let endMarker = '</td>';
+      let endIdx = section.indexOf(endMarker, startIdx + startMarker.length);
+      if (endIdx === -1) return null;
+      
+      let rawText = section.substring(startIdx + startMarker.length, endIdx);
+      return rawText.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    }
+    
     let usesContent = '';
-    $('b, strong').each((i, el) => {
-      const text = $(el).text().toLowerCase();
-      if (text.includes('uses') || text.includes('medicinal')) {
-        // Collect following siblings until next bold/header
-        let next = $(el).parent().next();
-        while (next.length && !next.find('b, strong').length) {
-          usesContent += next.text() + ' ';
-          next = next.next();
-        }
-      }
-    });
+    
+    const usesText = extractText(articleHtml, 'Uses');
+    if (usesText) usesContent += 'Uses: ' + usesText + '\n\n';
+    
+    const propsText = extractText(articleHtml, 'Properties');
+    if (propsText) usesContent += 'Properties: ' + propsText + '\n\n';
+    
+    const botanyText = extractText(articleHtml, 'Botany');
+    if (botanyText) usesContent += 'Botany: ' + botanyText + '\n\n';
 
     if (!usesContent.trim()) {
-      // Fallback: try to just grab everything in the center content
-      usesContent = $('body').text().substring(0, 3000); 
+      console.log(`[PROTA] No article content found for: ${scientificName}`);
+      return null;
     }
 
     return {
