@@ -57,6 +57,19 @@ function extractFromSources(sources, keywords, fieldName) {
   for (const source of sources) {
     if (!source || !source.raw_data) continue;
     
+    // Prelude databases return pure medicinal use lines separated by newlines, often in French.
+    if (source.source.includes('Prelude') && fieldName === 'uses') {
+      const lines = source.raw_data.split('\n').map(s => s.trim()).filter(s => s.length > 10);
+      lines.forEach(s => {
+        allFindings.push({
+          text: s,
+          score: TRUST_SCORES[source.source] || 0.9,
+          source: source.source
+        });
+      });
+      continue;
+    }
+    
     const sentences = splitSentences(cleanText(source.raw_data));
     const matched = sentences.filter((s) => matchesAny(s, keywords));
     
