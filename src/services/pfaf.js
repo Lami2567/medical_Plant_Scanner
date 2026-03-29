@@ -20,7 +20,9 @@ async function fetchPfafData(scientificName) {
     const $ = cheerio.load(data);
     
     // Extract medicinal uses
-    const medicinalContent = $('#ContentPlaceHolder1_txtMedicinal').text().trim();
+    let medicinalContent = $('#ContentPlaceHolder1_txtMediUses').text().trim();
+    // Remove the standard PFAF disclaimer if present
+    medicinalContent = medicinalContent.replace('Plants For A Future can not take any responsibility for any adverse effects from the use of plants. Always seek advice from a professional before using a plant medicinally.', '').trim();
     
     // Extract edible uses
     const edibleContent = $('#ContentPlaceHolder1_txtEdibleUses').text().trim();

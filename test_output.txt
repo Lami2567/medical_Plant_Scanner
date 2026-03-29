@@ -1,0 +1,46 @@
+﻿
+--- Testing image: ./TestImages/Bidens pilosa.jpg ---
+[PlantNet] Identified: Romerillo (Bidens alba)
+[MPNS] Normalizing name: Bidens alba
+[MPNS] Normalized: {
+  queryName: 'bidens alba',
+  resolvedName: 'Bidens alba',
+  timestamp: '2026-03-29T20:23:37.515Z'
+}
+[Prelude] Searching for: Bidens alba
+[Prelude] No exact ID found for: Bidens alba
+[Prelude] Data: None
+[PFAF] Fetching data for: Bidens alba
+[PFAF] Data: ...
+
+--- Testing image: ./TestImages/Blighia unijugata Bak.jpg ---
+[PlantNet] Identified: Triangle tops (Blighia unijugata)
+[MPNS] Normalizing name: Blighia unijugata
+[MPNS] Normalized: {
+  queryName: 'blighia unijugata',
+  resolvedName: 'Blighia unijugata',
+  timestamp: '2026-03-29T20:23:44.857Z'
+}
+[Prelude] Searching for: Blighia unijugata
+[Prelude] Mapped Blighia unijugata to ID: 851
+[Prelude] Data: H(092) poison de p├¬che, graines pil├⌐es de Blighia ...
+[PFAF] Fetching data for: Blighia unijugata
+[PFAF] Data: ...
+
+--- Testing image: ./TestImages/Bridelia micrantha Baill 2.jpg ---
+
+--- Testing image: ./TestImages/Bridelia micrantha Baill.jpg ---
+[PlantNet] Identified: Bridelia (Bridelia micrantha)
+[MPNS] Normalizing name: Bridelia micrantha
+[MPNS] Normalized: {
+  queryName: 'bridelia micrantha',
+  resolvedName: 'Bridelia micrantha',
+  timestamp: '2026-03-29T20:23:55.258Z'
+}
+[Prelude] Searching for: Bridelia micrantha
+[Prelude] Mapped Bridelia micrantha to ID: 949
+[Prelude] Data: H(022) ocytocique, ├⌐corces tige, rameau, tronc de ...
+[PFAF] Fetching data for: Bridelia micrantha
+[PFAF] Data: ...
+
+--- Testing image: ./TestImages/German Chamomile.webp ---
