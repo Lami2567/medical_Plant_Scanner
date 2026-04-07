@@ -12,7 +12,8 @@ const { fetchPfafData } = require('../services/pfaf');
 const { fetchPerenualData } = require('../services/perenual');
 const { fetchProtaData } = require('../services/prota');
 const { fetchPreludeData } = require('../services/prelude');
-const { mergePlantData } = require('../services/textProcessor');
+const { mergePlantData, accumulateRawData } = require('../services/textProcessor');
+const { cleanPlantData } = require('../services/aiCleaner');
 
 // ─── Multer Config ───────────────────────────────────────────────────────────
 const MAX_SIZE_MB = parseInt(process.env.MAX_IMAGE_SIZE_MB || '10');
@@ -45,19 +46,19 @@ const upload = multer({
 async function getPlantFromDB(plantName) {
   const normalized = plantName.toLowerCase().trim();
   const result = await pool.query(
-    'SELECT data FROM plants WHERE LOWER(plant_name) = $1 LIMIT 1',
+    'SELECT cleaned_data FROM plant_data WHERE LOWER(plant_name) = $1 LIMIT 1',
     [normalized]
   );
-  return result.rows[0]?.data || null;
+  return result.rows[0]?.cleaned_data || null;
 }
 
-async function savePlantToDB(plantName, scientificName, data) {
+async function savePlantToDB(plantName, scientificName, cleanedData, rawData) {
   try {
     await pool.query(
-      `INSERT INTO plants (plant_name, scientific_name, data)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (plant_name) DO UPDATE SET data = EXCLUDED.data, scientific_name = EXCLUDED.scientific_name`,
-      [plantName.toLowerCase().trim(), scientificName, data]
+      `INSERT INTO plant_data (plant_name, scientific_name, cleaned_data, raw_data)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (plant_name) DO UPDATE SET cleaned_data = EXCLUDED.cleaned_data, raw_data = EXCLUDED.raw_data, scientific_name = EXCLUDED.scientific_name`,
+      [plantName.toLowerCase().trim(), scientificName, cleanedData, rawData]
     );
   } catch (err) {
     console.error('[DB] Failed to cache plant:', err.message);
@@ -87,7 +88,10 @@ async function getMultiSourceKnowledge(commonName, scientificName) {
     fetchPreludeData(scientificName || commonName).catch(() => null)
   ]);
 
-  return mergePlantData(commonName, scientificName, [pfaf, perenual, prota, prelude]);
+  const rawData = accumulateRawData([pfaf, perenual, prota, prelude]);
+  const fallbackData = mergePlantData(commonName, scientificName, [pfaf, perenual, prota, prelude]);
+
+  return { fallbackData, rawData, sources: fallbackData.sources };
 }
 
 // ─── POST /scan-plant ─────────────────────────────────────────────────────────
@@ -130,12 +134,33 @@ router.post('/scan-plant', (req, res, next) => {
       }
 
       // Step 3: Multi-Source RAG
-      const plantData = await getMultiSourceKnowledge(identified.name, identified.scientificName);
+      const { fallbackData, rawData, sources } = await getMultiSourceKnowledge(identified.name, identified.scientificName);
+      
+      let plantData = null;
+      if (rawData) {
+        console.log('[SCAN] Passing raw data to AI Cleaner...');
+        const aiCleaned = await cleanPlantData(rawData);
+        if (aiCleaned) {
+          plantData = {
+             plant_name: fallbackData.plant_name,
+             scientific_name: fallbackData.scientific_name,
+             ...aiCleaned,
+             sources: sources,
+             disclaimer: fallbackData.disclaimer
+          };
+        }
+      }
+
+      if (!plantData) {
+        console.log('[SCAN] AI Cleaner failed or no data. Using fallback processed data.');
+        plantData = fallbackData;
+      }
+
       plantData.confidence_score = identified.confidence;
       plantData.from_cache = false;
 
       // Step 4: Save to DB
-      await savePlantToDB(identified.name, identified.scientificName, plantData);
+      await savePlantToDB(identified.name, identified.scientificName, plantData, { rawData });
 
       cleanup(imagePath);
       cleanup(compressedPath);
@@ -163,9 +188,29 @@ router.get('/plant/:name', async (req, res) => {
     if (cached) return res.json({ ...cached, from_cache: true });
 
     console.log(`[GET] Fetching live data for: ${plantName}`);
-    const plantData = await getMultiSourceKnowledge(plantName, null);
+    const { fallbackData, rawData, sources } = await getMultiSourceKnowledge(plantName, null);
     
-    await savePlantToDB(plantName, null, plantData);
+    let plantData = null;
+    if (rawData) {
+      console.log('[GET] Passing raw data to AI Cleaner...');
+      const aiCleaned = await cleanPlantData(rawData);
+      if (aiCleaned) {
+        plantData = {
+           plant_name: fallbackData.plant_name,
+           scientific_name: fallbackData.scientific_name,
+           ...aiCleaned,
+           sources: sources,
+           disclaimer: fallbackData.disclaimer
+        };
+      }
+    }
+
+    if (!plantData) {
+      console.log('[GET] AI Cleaner failed or no data. Using fallback processed data.');
+      plantData = fallbackData;
+    }
+    
+    await savePlantToDB(plantName, null, plantData, { rawData });
     plantData.from_cache = false;
     
     return res.json(plantData);

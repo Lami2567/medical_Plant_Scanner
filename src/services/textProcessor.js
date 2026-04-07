@@ -164,5 +164,13 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-module.exports = { mergePlantData };
+/**
+ * Accumulates raw data from all sources into a single raw text string.
+ */
+function accumulateRawData(sources) {
+  const activeSources = sources.filter(s => !!s && !!s.raw_data);
+  return activeSources.map(s => s.raw_data).join('\n\n');
+}
+
+module.exports = { mergePlantData, accumulateRawData };
 

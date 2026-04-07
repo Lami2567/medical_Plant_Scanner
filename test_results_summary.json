@@ -1,0 +1,115 @@
+[
+  {
+    "image": "Bidens pilosa.jpg",
+    "plant_name": "Romerillo",
+    "scientific_name": "Bidens alba",
+    "medical_properties": [
+      "Information not available"
+    ],
+    "uses": [
+      "Information not available"
+    ],
+    "status": "Success"
+  },
+  {
+    "image": "Blighia unijugata Bak.jpg",
+    "plant_name": "Triangle tops",
+    "scientific_name": "Blighia unijugata",
+    "medical_properties": [
+      "sedative",
+      "analgesic",
+      "oxytocic",
+      "antibacterial",
+      "rejuvenant",
+      "relaxant",
+      "tonic",
+      "purgative"
+    ],
+    "uses": [
+      "treatment of rheumatism",
+      "kidney pain and stiffness",
+      "fever",
+      "nausea and vomiting",
+      "vertigo",
+      "conjunctivitis",
+      "headaches",
+      "malaria",
+      "fibromes",
+      "cancer of the uterus",
+      "liver diseases"
+    ],
+    "status": "Success"
+  },
+  {
+    "image": "Bridelia micrantha Baill 2.jpg",
+    "error": {
+      "error": "Plant identification confidence too low (14.6%). Please try a clearer photo."
+    },
+    "status": "Failed"
+  },
+  {
+    "image": "Bridelia micrantha Baill.jpg",
+    "plant_name": "Bridelia",
+    "scientific_name": "Bridelia micrantha",
+    "medical_properties": [
+      "anti-inflammatory",
+      "antibacterial"
+    ],
+    "uses": [
+      "Uses: The wood is widely used for construction, poles, furniture, mortars, spoons and tool handles.",
+      "Bridelia micrantha is planted in agroforestry systems to provide shade and mulch, and it is sometimes used for hedges.",
+      "The bark is widely used in the treatment of wounds, and as a purgative, abortifacient and aphrodisiac, whereas in Congo bark decoctions are taken to treat cough and sore throat.",
+      "In South Africa the bark is used as a remedy for headache, sore joints, sore eyes, stomach-ache, diarrhoea, tapeworms, venereal diseases and fever.The leaves are used as a laxative and chewed against headache.",
+      "In Tanzania the roots are used to treat symptoms of non-insulin dependent diabetes mellitus such as excessive thirst and urine production, and sweating.",
+      "H(022) ocytocique, écorces tige, rameau, tronc de Bridelia micrantha de Glyphaea brevis, piler, macérer, VO.  H(104),  écorces tige, rameau, tronc de Bridelia micrantha, décoction (H2O), VO.",
+      "V(117), VO., décoction écorce boullie , Alangium chinense, Commiphora zimmermanii, Ekebergia capensis",
+      "V(117), écorces tiges, RNS.,  Bridelia micrantha + Alangium chinense + Commiphora zimmermannii + Ekebergia capensis"
+    ],
+    "status": "Success"
+  },
+  {
+    "image": "German Chamomile.webp",
+    "plant_name": "Hungarian chamomile",
+    "scientific_name": "Matricaria chamomilla",
+    "medical_properties": [
+      "anodyne",
+      "anti-inflammatory",
+      "antiseptic",
+      "antispasmodic",
+      "carminative",
+      "cholagogue",
+      "diaphoretic",
+      "emmenagogue",
+      "febrifuge",
+      "sedative",
+      "stomachic",
+      "tonic",
+      "vasodilator",
+      "anti-allergenic"
+    ],
+    "uses": [
+      "treat digestive disorders",
+      "treat nervous tension and irritability",
+      "treat skin problems",
+      "treat irritable bowel syndrome",
+      "treat Crohn's disease",
+      "treat peptic ulcers",
+      "treat hiatus hernia",
+      "treat wounds",
+      "treat sunburn",
+      "treat burns",
+      "treat haemorrhoids",
+      "treat mastitis",
+      "treat leg ulcers",
+      "treat asthma",
+      "treat hay fever",
+      "treat coughs and bronchitis",
+      "treat fevers and colds",
+      "treat inflammations of the skin",
+      "treat inflammation of the mouth and pharynx",
+      "treat tendency to infection",
+      "improve immunity"
+    ],
+    "status": "Success"
+  }
+]
