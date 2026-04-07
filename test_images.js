@@ -5,10 +5,10 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 // Fire up the server
-const server = require('./server'); // This requires server.js and starts it on port 8000
+// const server = require('./server'); // Removed to avoid port conflict
 
 const testImagesDir = path.join(__dirname, 'TestImages');
-const apiUrl = `http://localhost:${process.env.PORT || 8000}/scan-plant`;
+const apiUrl = `https://comparable-marylee-oceansltd-e03a5a06.koyeb.app/scan-plant`;
 
 async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

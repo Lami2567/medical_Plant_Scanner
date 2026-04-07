@@ -20,23 +20,21 @@
       "analgesic",
       "oxytocic",
       "antibacterial",
-      "rejuvenant",
-      "relaxant",
-      "tonic",
-      "purgative"
+      "antibacterial against Staphylococcus aureus"
     ],
     "uses": [
       "treatment of rheumatism",
-      "kidney pain and stiffness",
-      "fever",
-      "nausea and vomiting",
-      "vertigo",
-      "conjunctivitis",
-      "headaches",
-      "malaria",
-      "fibromes",
-      "cancer of the uterus",
-      "liver diseases"
+      "treatment of kidney pain and stiffness",
+      "treatment of fever",
+      "treatment of nausea and vomiting",
+      "treatment of vertigo",
+      "treatment of conjunctivitis",
+      "treatment of worms",
+      "treatment of headaches",
+      "treatment of malaria",
+      "treatment of fibromes",
+      "treatment of cancer of the uterus",
+      "treatment of liver diseases"
     ],
     "status": "Success"
   },
@@ -52,18 +50,31 @@
     "plant_name": "Bridelia",
     "scientific_name": "Bridelia micrantha",
     "medical_properties": [
+      "purgative",
+      "abortifacient",
+      "aphrodisiac",
+      "antibacterial",
       "anti-inflammatory",
-      "antibacterial"
+      "antiviral",
+      "antiretroviral"
     ],
     "uses": [
-      "Uses: The wood is widely used for construction, poles, furniture, mortars, spoons and tool handles.",
-      "Bridelia micrantha is planted in agroforestry systems to provide shade and mulch, and it is sometimes used for hedges.",
-      "The bark is widely used in the treatment of wounds, and as a purgative, abortifacient and aphrodisiac, whereas in Congo bark decoctions are taken to treat cough and sore throat.",
-      "In South Africa the bark is used as a remedy for headache, sore joints, sore eyes, stomach-ache, diarrhoea, tapeworms, venereal diseases and fever.The leaves are used as a laxative and chewed against headache.",
-      "In Tanzania the roots are used to treat symptoms of non-insulin dependent diabetes mellitus such as excessive thirst and urine production, and sweating.",
-      "H(022) ocytocique, écorces tige, rameau, tronc de Bridelia micrantha de Glyphaea brevis, piler, macérer, VO.  H(104),  écorces tige, rameau, tronc de Bridelia micrantha, décoction (H2O), VO.",
-      "V(117), VO., décoction écorce boullie , Alangium chinense, Commiphora zimmermanii, Ekebergia capensis",
-      "V(117), écorces tiges, RNS.,  Bridelia micrantha + Alangium chinense + Commiphora zimmermannii + Ekebergia capensis"
+      "treatment of wounds",
+      "cough and sore throat",
+      "headache",
+      "sore joints",
+      "sore eyes",
+      "stomach-ache",
+      "diarrhoea",
+      "tapeworms",
+      "venereal diseases",
+      "fever",
+      "laxative",
+      "anthelmintic",
+      "malaria",
+      "trypanosomiasis",
+      "non-insulin dependent diabetes mellitus",
+      "fortifying pregnant women"
     ],
     "status": "Success"
   },
