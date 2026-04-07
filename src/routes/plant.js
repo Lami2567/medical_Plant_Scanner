@@ -139,9 +139,10 @@ router.post('/scan-plant', (req, res, next) => {
       let plantData = null;
       let aiCleaned = null;
       if (rawData) {
-        console.log('[SCAN] Passing raw data to AI Cleaner...');
+        console.log(`[SCAN] Passing raw data to AI Cleaner (${rawData.length} chars)...`);
         aiCleaned = await cleanPlantData(rawData);
         if (aiCleaned) {
+          console.log('[SCAN] AI Cleaning Successful');
           plantData = {
              plant_name: fallbackData.plant_name,
              scientific_name: fallbackData.scientific_name,
@@ -198,9 +199,10 @@ router.get('/plant/:name', async (req, res) => {
     let plantData = null;
     let aiCleaned = null;
     if (rawData) {
-      console.log('[GET] Passing raw data to AI Cleaner...');
+      console.log(`[GET] Passing raw data to AI Cleaner (${rawData.length} chars)...`);
       aiCleaned = await cleanPlantData(rawData);
       if (aiCleaned) {
+        console.log('[GET] AI Cleaning Successful');
         plantData = {
            plant_name: fallbackData.plant_name,
            scientific_name: fallbackData.scientific_name,
