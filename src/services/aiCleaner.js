@@ -45,10 +45,10 @@ async function cleanPlantData(rawText) {
   // Pre-filter
   let filteredText = filterRawText(rawText);
 
-  // Truncate to max 3000 words
+  // Truncate to max 1200 words to stay within free-tier TPM limits
   const words = filteredText.split(' ');
-  if (words.length > 3000) {
-    filteredText = words.slice(0, 3000).join(' ');
+  if (words.length > 1200) {
+    filteredText = words.slice(0, 1200).join(' ');
   }
 
   if (filteredText.trim().length === 0) {
@@ -60,7 +60,7 @@ async function cleanPlantData(rawText) {
 Your task is to extract ONLY medically relevant information about a plant from raw text.
 
 STRICT RULES:
-- Ignore non-medical uses (e.g., timber, furniture, construction, decoration)
+- Ignore non-medical uses (e.g., wood, timber, furniture, construction, decoration, shade, fencing, crafts)
 - Focus ONLY on:
   - medicinal properties
   - health uses and benefits
@@ -90,24 +90,36 @@ ${filteredText}
 """
 `;
 
-  try {
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: 'llama-3.1-8b-instant', // A fast, standard llama3 model on Groq
-      temperature: 0.1, // Low temperature for factual extraction
-      response_format: { type: 'json_object' }
-    });
+  async function callGroqWithRetry(attempts = 2) {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const chatCompletion = await groq.chat.completions.create({
+          messages: [{ role: 'user', content: prompt }],
+          model: 'llama-3.1-8b-instant', 
+          temperature: 0.1,
+          response_format: { type: 'json_object' }
+        });
 
-    const outputString = chatCompletion.choices[0]?.message?.content;
-    if (!outputString) return null;
-
-    const parsedData = JSON.parse(outputString);
-    return parsedData;
-
-  } catch (error) {
-    console.error('[AI] Groq Request Failed:', error.message);
+        const outputString = chatCompletion.choices[0]?.message?.content;
+        if (!outputString) return null;
+        return JSON.parse(outputString);
+      } catch (error) {
+        const isRateLimit = error.message.toLowerCase().includes('rate_limit_exceeded') || error.status === 429;
+        
+        if (isRateLimit && i < attempts - 1) {
+          console.warn(`[AI] Rate limit hit. Retrying in 2 seconds... (Attempt ${i + 1}/${attempts})`);
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+        
+        console.error('[AI] Groq Request Failed:', error.message);
+        return null;
+      }
+    }
     return null;
   }
+
+  return await callGroqWithRetry();
 }
 
 module.exports = {

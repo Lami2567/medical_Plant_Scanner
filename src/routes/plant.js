@@ -137,9 +137,10 @@ router.post('/scan-plant', (req, res, next) => {
       const { fallbackData, rawData, sources } = await getMultiSourceKnowledge(identified.name, identified.scientificName);
       
       let plantData = null;
+      let aiCleaned = null;
       if (rawData) {
         console.log('[SCAN] Passing raw data to AI Cleaner...');
-        const aiCleaned = await cleanPlantData(rawData);
+        aiCleaned = await cleanPlantData(rawData);
         if (aiCleaned) {
           plantData = {
              plant_name: fallbackData.plant_name,
@@ -159,8 +160,12 @@ router.post('/scan-plant', (req, res, next) => {
       plantData.confidence_score = identified.confidence;
       plantData.from_cache = false;
 
-      // Step 4: Save to DB
-      await savePlantToDB(identified.name, identified.scientificName, plantData, { rawData });
+      // Step 4: Save to DB (Only cache if we successfully cleaned it or if we truly want the fallback)
+      // If AI failed, we still show the fallback to the user, but we DON'T save it to DB
+      // so that next time we can try the AI again.
+      if (aiCleaned) {
+        await savePlantToDB(identified.name, identified.scientificName, plantData, { rawData });
+      }
 
       cleanup(imagePath);
       cleanup(compressedPath);
@@ -191,9 +196,10 @@ router.get('/plant/:name', async (req, res) => {
     const { fallbackData, rawData, sources } = await getMultiSourceKnowledge(plantName, null);
     
     let plantData = null;
+    let aiCleaned = null;
     if (rawData) {
       console.log('[GET] Passing raw data to AI Cleaner...');
-      const aiCleaned = await cleanPlantData(rawData);
+      aiCleaned = await cleanPlantData(rawData);
       if (aiCleaned) {
         plantData = {
            plant_name: fallbackData.plant_name,
@@ -210,7 +216,10 @@ router.get('/plant/:name', async (req, res) => {
       plantData = fallbackData;
     }
     
-    await savePlantToDB(plantName, null, plantData, { rawData });
+    // Step 4: Save to DB (Only cache if we successfully cleaned it)
+    if (aiCleaned) {
+      await savePlantToDB(plantName, null, plantData, { rawData });
+    }
     plantData.from_cache = false;
     
     return res.json(plantData);
