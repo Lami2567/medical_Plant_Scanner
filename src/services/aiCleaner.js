@@ -18,7 +18,13 @@ function filterRawText(text) {
     'furniture',
     'construction',
     'ornamental use',
-    'fuel'
+    'fuel',
+    'shade',
+    'fencing',
+    'building',
+    'poles',
+    'crafts',
+    'decoration'
   ];
 
   // Split text into sentences and filter out any sentence containing the bad keywords
