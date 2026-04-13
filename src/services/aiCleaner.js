@@ -24,7 +24,10 @@ function filterRawText(text) {
     'building',
     'poles',
     'crafts',
-    'decoration'
+    'decoration',
+    'arrow poison',
+    'abortifacient',
+    'poisonous preparation'
   ];
 
   // Split text into sentences and filter out any sentence containing the bad keywords
@@ -72,6 +75,7 @@ IMPORTANT:
 
 STRICT RULES:
 - Ignore non-medical uses (e.g., timber, wood, furniture, construction, decoration, shade, fencing, crafts)
+- CRITICAL: EXCLUDE and REMOVE completely any mentions of creating poisons, arrow poisons, abortifacients, or harmful practices. These must NOT be in the output.
 - Focus ONLY on:
   - medicinal properties
   - health uses and benefits
