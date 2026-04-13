@@ -59,6 +59,7 @@ async function fetchProtaData(scientificName) {
       source: 'PROTA (Plant Resources of Tropical Africa)',
       trust_score: 0.95,
       url: articleUrl,
+      scientific_name: scientificName,
       medicinal_uses: usesContent.trim(),
       raw_data: usesContent.trim()
     };

@@ -34,6 +34,7 @@ async function fetchPfafData(scientificName) {
       source: 'Plants For A Future (PFAF)',
       trust_score: 0.8,
       url: url,
+      scientific_name: scientificName,
       medicinal_uses: medicinalContent,
       edible_uses: edibleContent,
       other_uses: otherContent,

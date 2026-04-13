@@ -76,6 +76,7 @@ async function fetchPreludeData(scientificName) {
       source: 'Prelude Medicinal Plants Database',
       trust_score: 0.9,
       url: detailUrl,
+      scientific_name: scientificName,
       medicinal_uses: treatments.trim(),
       raw_data: treatments.trim()
     };

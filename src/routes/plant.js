@@ -71,9 +71,6 @@ function cleanup(filePath) {
   }
 }
 
-/**
- * Orchestrates multi-source RAG retrieval.
- */
 async function getMultiSourceKnowledge(commonName, scientificName) {
   console.log(`[RAG] Fetching knowledge for ${commonName} (${scientificName})...`);
   
@@ -88,8 +85,27 @@ async function getMultiSourceKnowledge(commonName, scientificName) {
     fetchPreludeData(scientificName || commonName).catch(() => null)
   ]);
 
-  const rawData = accumulateRawData([pfaf, perenual, prota, prelude]);
-  const fallbackData = mergePlantData(commonName, scientificName, [pfaf, perenual, prota, prelude]);
+  // Filter out any source that returns data for a mismatched scientific name
+  const validSources = [pfaf, perenual, prota, prelude].filter(source => {
+    if (!source) return false;
+    
+    if (source.scientific_name && scientificName) {
+      // Extract genus & species (first 2 words) to ignore author abbreviations
+      const srcWords = source.scientific_name.toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/);
+      const reqWords = scientificName.toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/);
+      
+      if (srcWords.length >= 2 && reqWords.length >= 2) {
+        if (srcWords[0] !== reqWords[0] || srcWords[1] !== reqWords[1]) {
+          console.log(`[RAG] Discarding ${source.source} data: Name mismatch (${source.scientific_name} !== ${scientificName})`);
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+
+  const rawData = accumulateRawData(validSources);
+  const fallbackData = mergePlantData(commonName, scientificName, validSources);
 
   return { fallbackData, rawData, sources: fallbackData.sources };
 }

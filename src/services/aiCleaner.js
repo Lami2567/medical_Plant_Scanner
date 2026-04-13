@@ -61,33 +61,38 @@ async function cleanPlantData(rawText) {
     return null;
   }
 
-  const prompt = `You are a medicinal plant expert and data cleaner.
+  const prompt = `You are a medicinal plant expert and data interpreter.
 
-Your task is to extract ONLY medically relevant information about a plant from raw text.
+Your task is to extract and CLEAN medically relevant information from raw plant data.
+
+IMPORTANT:
+- Convert all extracted information into clear, human-readable sentences.
+- Do NOT return single words or short phrases.
+- Each item must be a meaningful, complete sentence.
 
 STRICT RULES:
-- Ignore non-medical uses (e.g., wood, timber, furniture, construction, decoration, shade, fencing, crafts)
+- Ignore non-medical uses (e.g., timber, wood, furniture, construction, decoration, shade, fencing, crafts)
 - Focus ONLY on:
   - medicinal properties
   - health uses and benefits
-  - who should use it
+  - who should use it (describe types of people e.g., adults, patients with specific conditions. Do not repeat uses)
   - who should NOT use it
   - side effects and warnings
 
 - Do NOT invent information
 - Do NOT guess
-- If information is not found, return "Information not available"
+- If information is missing, return: "Information not available"
 
 OUTPUT FORMAT (STRICT JSON):
 
 {
-  "medical_properties": [],
-  "uses": [],
-  "benefits": [],
-  "who_should_use": [],
-  "who_should_not_use": [],
-  "side_effects": [],
-  "warnings": []
+  "medical_properties": ["Each item must be a full sentence"],
+  "uses": ["Each item must be a full sentence explaining the use"],
+  "benefits": ["Each item must be a full sentence"],
+  "who_should_use": ["Describe clearly in sentences"],
+  "who_should_not_use": ["Describe clearly in sentences"],
+  "side_effects": ["Each item must be a full sentence"],
+  "warnings": ["Each item must be a full sentence"]
 }
 
 INPUT TEXT:
@@ -96,14 +101,14 @@ ${filteredText}
 """
 `;
 
-  async function callGroqWithRetry(attempts = 2) {
+  async function callGroqWithRetry(messages, format, attempts = 2) {
     for (let i = 0; i < attempts; i++) {
       try {
         const chatCompletion = await groq.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+          messages: messages,
           model: 'llama-3.1-8b-instant', 
           temperature: 0.1,
-          response_format: { type: 'json_object' }
+          response_format: format
         });
 
         const outputString = chatCompletion.choices[0]?.message?.content;
@@ -125,7 +130,37 @@ ${filteredText}
     return null;
   }
 
-  return await callGroqWithRetry();
+  const extractedData = await callGroqWithRetry([{ role: 'user', content: prompt }], { type: 'json_object' });
+  if (!extractedData) return null;
+
+  // Step 2: AI Enhancement
+  const enhancePrompt = `Rewrite the following plant data into clear, well-explained medical information.
+
+- Expand short phrases into meaningful full sentences
+- Keep it factual
+- Do NOT add new information
+
+Return the same JSON structure but improved readability.
+
+OUTPUT FORMAT (STRICT JSON):
+
+{
+  "medical_properties": [],
+  "uses": [],
+  "benefits": [],
+  "who_should_use": [],
+  "who_should_not_use": [],
+  "side_effects": [],
+  "warnings": []
+}
+
+INPUT JSON:
+"""
+${JSON.stringify(extractedData, null, 2)}
+"""`;
+
+  const enhancedData = await callGroqWithRetry([{ role: 'user', content: enhancePrompt }], { type: 'json_object' });
+  return enhancedData || extractedData;
 }
 
 module.exports = {
