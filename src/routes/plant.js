@@ -2,10 +2,12 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const sharp = require('sharp');
 
 const router = express.Router();
 const pool = require('../db/postgres');
+const { verifyToken } = require('../services/firebase');
 const { identifyPlant } = require('../services/plantnet');
 const { normalizePlantName } = require('../services/mpns');
 const { fetchPfafData } = require('../services/pfaf');
@@ -43,6 +45,14 @@ const upload = multer({
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function generateImageHash(filePath) {
+  const fileBuffer = fs.readFileSync(filePath);
+  const hashSum = crypto.createHash('sha256');
+  hashSum.update(fileBuffer);
+  return hashSum.digest('hex');
+}
+
 async function getPlantFromDB(plantName) {
   const normalized = plantName.toLowerCase().trim();
   const result = await pool.query(
@@ -111,7 +121,7 @@ async function getMultiSourceKnowledge(commonName, scientificName) {
 }
 
 // ─── POST /scan-plant ─────────────────────────────────────────────────────────
-router.post('/scan-plant', (req, res, next) => {
+router.post('/scan-plant', verifyToken, (req, res, next) => {
   upload.single('image')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -129,6 +139,32 @@ router.post('/scan-plant', (req, res, next) => {
         return res.status(400).json({ error: 'No image provided. Include an image file in the "image" field.' });
       }
 
+      const uid = req.user.uid;
+      const imageHash = generateImageHash(imagePath);
+
+      // Step 0: Check if Image Hash exists in scans for immediate deduplication
+      try {
+        const scanResult = await pool.query('SELECT plant_name FROM scans WHERE image_hash = $1 LIMIT 1', [imageHash]);
+        if (scanResult.rows.length > 0) {
+          const matchedPlantName = scanResult.rows[0].plant_name;
+          const cached = await getPlantFromDB(matchedPlantName);
+          if (cached) {
+            console.log(`[SCAN] Image Deduplication triggered: Reusing ${matchedPlantName} data.`);
+            
+            // Record scan history for this user
+            await pool.query(
+              `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
+              [uid, matchedPlantName, imageHash]
+            );
+
+            cleanup(imagePath);
+            return res.json({ ...cached, confidence_score: 100, from_cache: true, deduplicated: true });
+          }
+        }
+      } catch (dbErr) {
+        console.error('[DB CHECK ERROR] deduplication check failed:', dbErr.message);
+      }
+
       const compressedPath = imagePath.replace(/(\.\w+)$/, '_compressed.jpg');
       await sharp(imagePath)
         .resize({ width: 1024, withoutEnlargement: true })
@@ -144,6 +180,14 @@ router.post('/scan-plant', (req, res, next) => {
       const cached = await getPlantFromDB(identified.name);
       if (cached) {
         console.log('[SCAN] Returning cached result');
+        
+        try {
+          await pool.query(
+            `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
+            [uid, identified.name.toLowerCase().trim(), imageHash]
+          );
+        } catch (err) { console.error('[DB ERROR] Failed to record scan cache hit:', err.message); }
+
         cleanup(imagePath);
         cleanup(compressedPath);
         return res.json({ ...cached, confidence_score: identified.confidence, from_cache: true });
@@ -182,6 +226,13 @@ router.post('/scan-plant', (req, res, next) => {
       // so that next time we can try the AI again.
       if (aiCleaned) {
         await savePlantToDB(identified.name, identified.scientificName, plantData, { rawData });
+        // Record scan history
+        try {
+          await pool.query(
+            `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
+            [uid, identified.name.toLowerCase().trim(), imageHash]
+          );
+        } catch (err) { console.error('[DB ERROR] Failed to record scan:', err.message); }
       }
 
       cleanup(imagePath);

@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 
 const plantRoutes = require('./src/routes/plant');
+const userRoutes = require('./src/routes/user');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -48,6 +49,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/', plantRoutes);
+app.use('/user', userRoutes);
 
 // ─── Health Check ───────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {

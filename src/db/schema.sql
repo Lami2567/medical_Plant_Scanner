@@ -12,3 +12,21 @@ CREATE TABLE IF NOT EXISTS plant_data (
 
 -- Index for fast name lookups
 CREATE INDEX IF NOT EXISTS idx_plant_data_plant_name ON plant_data (plant_name);
+
+CREATE TABLE IF NOT EXISTS users (
+  uid          TEXT PRIMARY KEY,
+  email        TEXT,
+  name         TEXT,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS scans (
+  scan_id      SERIAL PRIMARY KEY,
+  user_id      TEXT REFERENCES users(uid) ON DELETE CASCADE,
+  plant_name   TEXT REFERENCES plant_data(plant_name) ON DELETE CASCADE,
+  image_hash   TEXT NOT NULL,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
+-- Index for quickly looking up deduplicated images
+CREATE INDEX IF NOT EXISTS idx_scans_image_hash ON scans (image_hash);
