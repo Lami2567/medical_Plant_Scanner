@@ -13,4 +13,10 @@ pool.on('error', (err) => {
   console.error('[DB] Unexpected pool error:', err.message);
 });
 
+pool.query('ALTER TABLE scans ADD COLUMN IF NOT EXISTS image_url TEXT').catch(
+  (err) => {
+    console.error('[DB] Failed to ensure scans.image_url column:', err.message);
+  }
+);
+
 module.exports = pool;

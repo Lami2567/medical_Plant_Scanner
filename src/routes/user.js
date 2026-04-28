@@ -28,7 +28,7 @@ router.get('/history', async (req, res) => {
   const { uid } = req.user;
   try {
     const result = await pool.query(
-      `SELECT s.scan_id, s.image_hash, s.created_at, pd.plant_name, pd.scientific_name, pd.cleaned_data
+      `SELECT s.scan_id, s.image_hash, s.image_url, s.created_at, pd.plant_name, pd.scientific_name, pd.cleaned_data
        FROM scans s
        JOIN plant_data pd ON s.plant_name = pd.plant_name
        WHERE s.user_id = $1
@@ -40,6 +40,7 @@ router.get('/history', async (req, res) => {
     const history = result.rows.map(row => ({
       scan_id: row.scan_id,
       image_hash: row.image_hash,
+      image_url: row.image_url,
       scanned_at: row.created_at,
       plant_name: row.plant_name,
       scientific_name: row.scientific_name,

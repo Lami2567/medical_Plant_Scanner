@@ -16,6 +16,7 @@ const { fetchProtaData } = require('../services/prota');
 const { fetchPreludeData } = require('../services/prelude');
 const { mergePlantData, accumulateRawData } = require('../services/textProcessor');
 const { cleanPlantData } = require('../services/aiCleaner');
+const { uploadScanImage } = require('../services/storage');
 
 // ─── Multer Config ───────────────────────────────────────────────────────────
 const MAX_SIZE_MB = parseInt(process.env.MAX_IMAGE_SIZE_MB || '10');
@@ -92,11 +93,11 @@ async function ensureUserRecord(user) {
   }
 }
 
-async function recordScan(user, plantName, imageHash) {
+async function recordScan(user, plantName, imageHash, imageUrl = null) {
   await ensureUserRecord(user);
   await pool.query(
-    `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
-    [user.uid, plantName.toLowerCase().trim(), imageHash]
+    `INSERT INTO scans (user_id, plant_name, image_hash, image_url) VALUES ($1, $2, $3, $4)`,
+    [user.uid, plantName.toLowerCase().trim(), imageHash, imageUrl]
   );
 }
 
@@ -169,18 +170,33 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
 
       // Step 0: Check if Image Hash exists in scans for immediate deduplication
       try {
-        const scanResult = await pool.query('SELECT plant_name FROM scans WHERE image_hash = $1 LIMIT 1', [imageHash]);
+        const scanResult = await pool.query(
+          'SELECT plant_name, image_url FROM scans WHERE image_hash = $1 LIMIT 1',
+          [imageHash]
+        );
         if (scanResult.rows.length > 0) {
           const matchedPlantName = scanResult.rows[0].plant_name;
+          const matchedImageUrl = scanResult.rows[0].image_url || null;
           const cached = await getPlantFromDB(matchedPlantName);
           if (cached) {
             console.log(`[SCAN] Image Deduplication triggered: Reusing ${matchedPlantName} data.`);
             
             // Record scan history for this user
-            await recordScan(req.user, matchedPlantName, imageHash);
+            await recordScan(
+              req.user,
+              matchedPlantName,
+              imageHash,
+              matchedImageUrl
+            );
 
             cleanup(imagePath);
-            return res.json({ ...cached, confidence_score: 100, from_cache: true, deduplicated: true });
+            return res.json({
+              ...cached,
+              image_url: matchedImageUrl,
+              confidence_score: 100,
+              from_cache: true,
+              deduplicated: true,
+            });
           }
         }
       } catch (dbErr) {
@@ -193,6 +209,19 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
         .jpeg({ quality: 85 })
         .toFile(compressedPath);
 
+      let uploadedImageUrl = null;
+      try {
+        uploadedImageUrl = await uploadScanImage(compressedPath, {
+          userId: req.user.uid,
+          imageHash,
+        });
+      } catch (uploadError) {
+        console.error(
+          '[STORAGE ERROR] Failed to upload scan image:',
+          uploadError.message
+        );
+      }
+
       // Step 1: Identify plant
       console.log('[SCAN] Identifying plant...');
       const identified = await identifyPlant(compressedPath);
@@ -204,12 +233,22 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
         console.log('[SCAN] Returning cached result');
         
         try {
-          await recordScan(req.user, identified.name, imageHash);
+          await recordScan(
+            req.user,
+            identified.name,
+            imageHash,
+            uploadedImageUrl
+          );
         } catch (err) { console.error('[DB ERROR] Failed to record scan cache hit:', err.message); }
 
         cleanup(imagePath);
         cleanup(compressedPath);
-        return res.json({ ...cached, confidence_score: identified.confidence, from_cache: true });
+        return res.json({
+          ...cached,
+          image_url: uploadedImageUrl,
+          confidence_score: identified.confidence,
+          from_cache: true,
+        });
       }
 
       // Step 3: Multi-Source RAG
@@ -239,6 +278,7 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
 
       plantData.confidence_score = identified.confidence;
       plantData.from_cache = false;
+      plantData.image_url = uploadedImageUrl;
 
       // Save the best result we have so history can always resolve a scan entry.
       // If AI cleaning failed, we still persist the fallback result instead of
@@ -251,7 +291,12 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
       );
 
       try {
-        await recordScan(req.user, identified.name, imageHash);
+        await recordScan(
+          req.user,
+          identified.name,
+          imageHash,
+          uploadedImageUrl
+        );
       } catch (err) {
         console.error('[DB ERROR] Failed to record scan:', err.message);
       }

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS scans (
   user_id      TEXT REFERENCES users(uid) ON DELETE CASCADE,
   plant_name   TEXT REFERENCES plant_data(plant_name) ON DELETE CASCADE,
   image_hash   TEXT NOT NULL,
+  image_url    TEXT,
   created_at   TIMESTAMP DEFAULT NOW()
 );
 
