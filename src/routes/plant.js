@@ -75,6 +75,31 @@ async function savePlantToDB(plantName, scientificName, cleanedData, rawData) {
   }
 }
 
+async function ensureUserRecord(user) {
+  if (!user?.uid) return;
+
+  try {
+    await pool.query(
+      `INSERT INTO users (uid, email, name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (uid) DO UPDATE
+       SET email = EXCLUDED.email, name = EXCLUDED.name`,
+      [user.uid, user.email || null, user.name || user.displayName || null]
+    );
+  } catch (err) {
+    console.error('[DB ERROR] Failed to ensure user record:', err.message);
+    throw err;
+  }
+}
+
+async function recordScan(user, plantName, imageHash) {
+  await ensureUserRecord(user);
+  await pool.query(
+    `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
+    [user.uid, plantName.toLowerCase().trim(), imageHash]
+  );
+}
+
 function cleanup(filePath) {
   if (filePath && fs.existsSync(filePath)) {
     fs.unlink(filePath, () => {});
@@ -139,7 +164,7 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
         return res.status(400).json({ error: 'No image provided. Include an image file in the "image" field.' });
       }
 
-      const uid = req.user.uid;
+      await ensureUserRecord(req.user);
       const imageHash = generateImageHash(imagePath);
 
       // Step 0: Check if Image Hash exists in scans for immediate deduplication
@@ -152,10 +177,7 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
             console.log(`[SCAN] Image Deduplication triggered: Reusing ${matchedPlantName} data.`);
             
             // Record scan history for this user
-            await pool.query(
-              `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
-              [uid, matchedPlantName, imageHash]
-            );
+            await recordScan(req.user, matchedPlantName, imageHash);
 
             cleanup(imagePath);
             return res.json({ ...cached, confidence_score: 100, from_cache: true, deduplicated: true });
@@ -182,10 +204,7 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
         console.log('[SCAN] Returning cached result');
         
         try {
-          await pool.query(
-            `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
-            [uid, identified.name.toLowerCase().trim(), imageHash]
-          );
+          await recordScan(req.user, identified.name, imageHash);
         } catch (err) { console.error('[DB ERROR] Failed to record scan cache hit:', err.message); }
 
         cleanup(imagePath);
@@ -221,18 +240,20 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
       plantData.confidence_score = identified.confidence;
       plantData.from_cache = false;
 
-      // Step 4: Save to DB (Only cache if we successfully cleaned it or if we truly want the fallback)
-      // If AI failed, we still show the fallback to the user, but we DON'T save it to DB
-      // so that next time we can try the AI again.
-      if (aiCleaned) {
-        await savePlantToDB(identified.name, identified.scientificName, plantData, { rawData });
-        // Record scan history
-        try {
-          await pool.query(
-            `INSERT INTO scans (user_id, plant_name, image_hash) VALUES ($1, $2, $3)`,
-            [uid, identified.name.toLowerCase().trim(), imageHash]
-          );
-        } catch (err) { console.error('[DB ERROR] Failed to record scan:', err.message); }
+      // Save the best result we have so history can always resolve a scan entry.
+      // If AI cleaning failed, we still persist the fallback result instead of
+      // dropping the user's scan from history.
+      await savePlantToDB(
+        identified.name,
+        identified.scientificName,
+        plantData,
+        rawData ? { rawData, ai_cleaned: Boolean(aiCleaned) } : { ai_cleaned: Boolean(aiCleaned) }
+      );
+
+      try {
+        await recordScan(req.user, identified.name, imageHash);
+      } catch (err) {
+        console.error('[DB ERROR] Failed to record scan:', err.message);
       }
 
       cleanup(imagePath);
@@ -299,4 +320,3 @@ router.get('/plant/:name', async (req, res) => {
 });
 
 module.exports = router;
-
