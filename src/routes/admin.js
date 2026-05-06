@@ -229,6 +229,64 @@ router.get('/users', async (req, res, next) => {
   }
 });
 
+router.get('/scans/:scanId', async (req, res, next) => {
+  const scanId = Number.parseInt(req.params.scanId, 10);
+
+  if (!Number.isInteger(scanId) || scanId <= 0) {
+    return res.status(400).json({ error: 'A valid scan id is required.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT
+         s.scan_id,
+         s.user_id,
+         COALESCE(NULLIF(u.name, ''), 'Unnamed user') AS user_name,
+         u.email,
+         s.plant_name,
+         pd.scientific_name,
+         pd.cleaned_data,
+         s.image_hash,
+         s.image_url,
+         s.status,
+         s.error_message,
+         s.created_at,
+         s.updated_at
+       FROM scans s
+       LEFT JOIN users u ON u.uid = s.user_id
+       LEFT JOIN plant_data pd ON pd.plant_name = s.plant_name
+       WHERE s.scan_id = $1
+       LIMIT 1`,
+      [scanId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Scan not found.' });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      scan: {
+        scan_id: row.scan_id,
+        user_id: row.user_id,
+        user_name: row.user_name,
+        email: row.email,
+        plant_name: row.plant_name,
+        scientific_name: row.scientific_name,
+        image_hash: row.image_hash,
+        image_url: row.image_url,
+        status: row.status,
+        error_message: row.error_message,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        scan_data: row.cleaned_data || null,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/scans', async (req, res, next) => {
   const { page, limit, offset } = parsePagination(req.query);
   const requestedStatus = String(req.query.status || '').toLowerCase();
