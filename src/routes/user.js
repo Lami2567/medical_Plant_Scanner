@@ -54,4 +54,33 @@ router.get('/history', async (req, res) => {
   }
 });
 
+// Delete a single scan from the signed-in user's history.
+// This only removes the scan row; shared plant_data cache remains intact.
+router.delete('/history/:scanId', async (req, res) => {
+  const { uid } = req.user;
+  const scanId = Number.parseInt(req.params.scanId, 10);
+
+  if (!Number.isInteger(scanId) || scanId <= 0) {
+    return res.status(400).json({ error: 'A valid scan id is required.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `DELETE FROM scans
+       WHERE scan_id = $1 AND user_id = $2
+       RETURNING scan_id`,
+      [scanId, uid]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Scan not found.' });
+    }
+
+    return res.json({ success: true, scan_id: result.rows[0].scan_id });
+  } catch (error) {
+    console.error('[HISTORY DELETE ERROR]', error.message);
+    return res.status(500).json({ error: 'Failed to delete scan.' });
+  }
+});
+
 module.exports = router;
