@@ -26,8 +26,13 @@ CREATE TABLE IF NOT EXISTS scans (
   plant_name   TEXT REFERENCES plant_data(plant_name) ON DELETE CASCADE,
   image_hash   TEXT NOT NULL,
   image_url    TEXT,
+  status       TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failed')),
+  error_message TEXT,
+  updated_at   TIMESTAMP DEFAULT NOW(),
   created_at   TIMESTAMP DEFAULT NOW()
 );
 
 -- Index for quickly looking up deduplicated images
 CREATE INDEX IF NOT EXISTS idx_scans_image_hash ON scans (image_hash);
+CREATE INDEX IF NOT EXISTS idx_scans_status ON scans (status);
+CREATE INDEX IF NOT EXISTS idx_scans_created_at ON scans (created_at);

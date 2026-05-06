@@ -93,12 +93,30 @@ async function ensureUserRecord(user) {
   }
 }
 
-async function recordScan(user, plantName, imageHash, imageUrl = null) {
+async function recordScan(user, plantName, imageHash, imageUrl = null, status = 'success', errorMessage = null) {
   await ensureUserRecord(user);
   await pool.query(
-    `INSERT INTO scans (user_id, plant_name, image_hash, image_url) VALUES ($1, $2, $3, $4)`,
-    [user.uid, plantName.toLowerCase().trim(), imageHash, imageUrl]
+    `INSERT INTO scans (user_id, plant_name, image_hash, image_url, status, error_message)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      user.uid,
+      plantName ? plantName.toLowerCase().trim() : null,
+      imageHash,
+      imageUrl,
+      status,
+      errorMessage ? String(errorMessage).slice(0, 1000) : null,
+    ]
   );
+}
+
+async function recordFailedScan(user, imageHash, imageUrl, errorMessage) {
+  if (!user?.uid || !imageHash) return;
+
+  try {
+    await recordScan(user, null, imageHash, imageUrl, 'failed', errorMessage);
+  } catch (err) {
+    console.error('[DB ERROR] Failed to record failed scan:', err.message);
+  }
 }
 
 function cleanup(filePath) {
@@ -159,6 +177,9 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
     }
 
     const imagePath = req.file?.path;
+    let imageHash = null;
+    let compressedPath = null;
+    let uploadedImageUrl = null;
 
     try {
       if (!req.file) {
@@ -166,12 +187,17 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
       }
 
       await ensureUserRecord(req.user);
-      const imageHash = generateImageHash(imagePath);
+      imageHash = generateImageHash(imagePath);
 
       // Step 0: Check if Image Hash exists in scans for immediate deduplication
       try {
         const scanResult = await pool.query(
-          'SELECT plant_name, image_url FROM scans WHERE image_hash = $1 LIMIT 1',
+          `SELECT plant_name, image_url
+           FROM scans
+           WHERE image_hash = $1
+             AND status = 'success'
+             AND plant_name IS NOT NULL
+           LIMIT 1`,
           [imageHash]
         );
         if (scanResult.rows.length > 0) {
@@ -203,13 +229,12 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
         console.error('[DB CHECK ERROR] deduplication check failed:', dbErr.message);
       }
 
-      const compressedPath = imagePath.replace(/(\.\w+)$/, '_compressed.jpg');
+      compressedPath = imagePath.replace(/(\.\w+)$/, '_compressed.jpg');
       await sharp(imagePath)
         .resize({ width: 1024, withoutEnlargement: true })
         .jpeg({ quality: 85 })
         .toFile(compressedPath);
 
-      let uploadedImageUrl = null;
       try {
         uploadedImageUrl = await uploadScanImage(compressedPath, {
           userId: req.user.uid,
@@ -306,10 +331,22 @@ router.post('/scan-plant', verifyToken, (req, res, next) => {
 
       return res.json(plantData);
     } catch (error) {
-      cleanup(imagePath);
       console.error('[SCAN ERROR]', error.message);
+
+      if (req.file) {
+        try {
+          imageHash = imageHash || generateImageHash(imagePath);
+        } catch (hashError) {
+          imageHash = imageHash || `failed-${crypto.randomUUID()}`;
+        }
+
+        await recordFailedScan(req.user, imageHash, uploadedImageUrl, error.message);
+      }
+
+      cleanup(imagePath);
+      cleanup(compressedPath);
       
-      const userFacingErrors = ['not recognized', 'confidence', 'PlantNet API', 'file type', 'too large'];
+      const userFacingErrors = ['not recognized', 'confidence', 'plantnet api', 'file type', 'too large'];
       const isUserFacing = userFacingErrors.some((kw) => error.message.toLowerCase().includes(kw));
 
       return res.status(isUserFacing ? 400 : 500).json({ error: error.message });

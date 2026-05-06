@@ -32,6 +32,7 @@ router.get('/history', async (req, res) => {
        FROM scans s
        JOIN plant_data pd ON s.plant_name = pd.plant_name
        WHERE s.user_id = $1
+         AND s.status = 'success'
        ORDER BY s.created_at DESC`,
       [uid]
     );

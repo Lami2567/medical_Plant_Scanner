@@ -8,6 +8,7 @@ const fs = require('fs');
 
 const plantRoutes = require('./src/routes/plant');
 const userRoutes = require('./src/routes/user');
+const adminRoutes = require('./src/routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -16,7 +17,19 @@ const PORT = process.env.PORT || 8000;
 app.set('trust proxy', 1);
 
 // ─── Security Middleware ────────────────────────────────────────────────────
-app.use(helmet());
+const cspDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
+delete cspDirectives['upgrade-insecure-requests'];
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...cspDirectives,
+      'connect-src': ["'self'", 'http://localhost:*', 'http://127.0.0.1:*', 'https:'],
+      'img-src': ["'self'", 'data:', 'https:'],
+      'script-src': ["'self'", 'https://cdn.jsdelivr.net'],
+    },
+  },
+}));
 app.use(cors());
 app.use(express.json());
 
@@ -43,13 +56,20 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       scan: '/scan-plant (POST)',
-      get_plant: '/plant/:name (GET)'
+      get_plant: '/plant/:name (GET)',
+      admin: '/admin-dashboard'
     }
   });
 });
 
 app.use('/', plantRoutes);
 app.use('/user', userRoutes);
+app.use('/admin', adminRoutes);
+
+const adminDir = path.join(__dirname, '..', 'admin');
+if (fs.existsSync(adminDir)) {
+  app.use('/admin-dashboard', express.static(adminDir));
+}
 
 // ─── Health Check ───────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
