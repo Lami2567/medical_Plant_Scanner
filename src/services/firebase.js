@@ -46,7 +46,7 @@ const verifyToken = async (req, res, next) => {
   const token = authHeader.substring('Bearer '.length).trim();
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken;
+    req.user = await enrichTokenUser(decodedToken);
     next();
   } catch (error) {
     console.error('[AUTH ERROR]', error.code || error.message);
@@ -54,4 +54,46 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-module.exports = { admin, verifyToken };
+async function enrichTokenUser(decodedToken) {
+  if (!decodedToken?.uid) return decodedToken;
+
+  try {
+    const record = await admin.auth().getUser(decodedToken.uid);
+    return {
+      ...decodedToken,
+      email: decodedToken.email || record.email || null,
+      name: decodedToken.name || record.displayName || null,
+      displayName: decodedToken.displayName || record.displayName || decodedToken.name || null,
+      picture: decodedToken.picture || record.photoURL || null,
+      photoURL: decodedToken.photoURL || record.photoURL || decodedToken.picture || null,
+    };
+  } catch (error) {
+    console.warn('[FIREBASE] Could not enrich user profile:', error.code || error.message);
+    return decodedToken;
+  }
+}
+
+async function getUserProfilesByUid(uids = []) {
+  if (!firebaseReady) return new Map();
+
+  const uniqueUids = [...new Set(uids.filter(Boolean))];
+  if (!uniqueUids.length) return new Map();
+
+  try {
+    const result = await admin.auth().getUsers(uniqueUids.map((uid) => ({ uid })));
+    return new Map(result.users.map((user) => [
+      user.uid,
+      {
+        uid: user.uid,
+        email: user.email || null,
+        name: user.displayName || null,
+        photo_url: user.photoURL || null,
+      },
+    ]));
+  } catch (error) {
+    console.warn('[FIREBASE] Could not fetch user profiles:', error.code || error.message);
+    return new Map();
+  }
+}
+
+module.exports = { admin, getUserProfilesByUid, verifyToken };

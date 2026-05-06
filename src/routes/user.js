@@ -8,13 +8,16 @@ router.use(verifyToken);
 
 // Update user details on login or just to keep sync
 router.post('/sync', async (req, res) => {
-  const { uid, email, name } = req.user;
+  const { uid, email, name, displayName, picture, photoURL } = req.user;
   try {
     await pool.query(
-      `INSERT INTO users (uid, email, name)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (uid) DO UPDATE SET email = EXCLUDED.email, name = EXCLUDED.name`,
-      [uid, email, name]
+      `INSERT INTO users (uid, email, name, photo_url)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (uid) DO UPDATE SET 
+         email = COALESCE(EXCLUDED.email, users.email), 
+         name = COALESCE(EXCLUDED.name, users.name),
+         photo_url = COALESCE(EXCLUDED.photo_url, users.photo_url)`,
+      [uid, email, name || displayName || null, photoURL || picture || null]
     );
     return res.json({ success: true });
   } catch (err) {

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const nodemailer = require('nodemailer');
 const pool = require('../db/postgres');
+const { getUserProfilesByUid } = require('../services/firebase');
 
 const router = express.Router();
 const DEFAULT_LIMIT = 20;
@@ -123,6 +124,30 @@ function pageMeta(total, page, limit) {
   };
 }
 
+async function attachFirebaseProfiles(rows, uidField = 'uid') {
+  const missingProfileUids = rows
+    .filter((row) => row?.[uidField] && !row.photo_url)
+    .map((row) => row[uidField]);
+  const profiles = await getUserProfilesByUid(missingProfileUids);
+
+  if (!profiles.size) return rows;
+
+  return rows.map((row) => {
+    const profile = profiles.get(row[uidField]);
+    if (!profile) return row;
+    const hasDefaultName = row.name === 'Unnamed user';
+    const hasDefaultUserName = row.user_name === 'Unnamed user';
+
+    return {
+      ...row,
+      email: row.email || profile.email,
+      name: !row.name || hasDefaultName ? profile.name || row.name : row.name,
+      user_name: !row.user_name || hasDefaultUserName ? profile.name || row.user_name : row.user_name,
+      photo_url: row.photo_url || profile.photo_url,
+    };
+  });
+}
+
 function getMailTransportConfig() {
   const host = process.env.SMTP_HOST;
   const port = Number.parseInt(process.env.SMTP_PORT || '587', 10);
@@ -209,6 +234,7 @@ router.get('/users', async (req, res, next) => {
          u.uid,
          COALESCE(NULLIF(u.name, ''), 'Unnamed user') AS name,
          u.email,
+         u.photo_url,
          u.created_at,
          COUNT(s.scan_id)::int AS total_scans
        FROM users u
@@ -220,8 +246,10 @@ router.get('/users', async (req, res, next) => {
       dataParams
     );
 
+    const users = await attachFirebaseProfiles(usersResult.rows);
+
     return res.json({
-      users: usersResult.rows,
+      users,
       pagination: pageMeta(total, page, limit),
     });
   } catch (error) {
@@ -248,6 +276,7 @@ router.get('/scans/:scanId', async (req, res, next) => {
          pd.cleaned_data,
          s.image_hash,
          s.image_url,
+         u.photo_url,
          s.status,
          s.error_message,
          s.created_at,
@@ -264,7 +293,7 @@ router.get('/scans/:scanId', async (req, res, next) => {
       return res.status(404).json({ error: 'Scan not found.' });
     }
 
-    const row = result.rows[0];
+    const [row] = await attachFirebaseProfiles(result.rows, 'user_id');
     return res.json({
       scan: {
         scan_id: row.scan_id,
@@ -275,6 +304,8 @@ router.get('/scans/:scanId', async (req, res, next) => {
         scientific_name: row.scientific_name,
         image_hash: row.image_hash,
         image_url: row.image_url,
+        user_photo: row.photo_url,
+        photo_url: row.photo_url,
         status: row.status,
         error_message: row.error_message,
         created_at: row.created_at,
@@ -336,6 +367,7 @@ router.get('/scans', async (req, res, next) => {
          u.email,
          s.plant_name,
          s.image_url,
+         u.photo_url,
          s.status,
          s.error_message,
          s.created_at
@@ -347,8 +379,10 @@ router.get('/scans', async (req, res, next) => {
       dataParams
     );
 
+    const scans = await attachFirebaseProfiles(scansResult.rows, 'user_id');
+
     return res.json({
-      scans: scansResult.rows,
+      scans,
       pagination: pageMeta(total, page, limit),
     });
   } catch (error) {
@@ -382,9 +416,11 @@ router.get('/failed-scans', async (req, res, next) => {
     const failedResult = await pool.query(
       `SELECT
          s.scan_id,
+         s.user_id,
          COALESCE(NULLIF(u.name, ''), 'Unnamed user') AS user_name,
          u.email,
          s.image_url,
+         u.photo_url,
          s.error_message,
          s.created_at
        FROM scans s
@@ -395,8 +431,10 @@ router.get('/failed-scans', async (req, res, next) => {
       dataParams
     );
 
+    const failedScans = await attachFirebaseProfiles(failedResult.rows, 'user_id');
+
     return res.json({
-      failedScans: failedResult.rows,
+      failedScans,
       pagination: pageMeta(total, page, limit),
     });
   } catch (error) {

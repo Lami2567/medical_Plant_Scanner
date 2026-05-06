@@ -25,8 +25,10 @@ app.use(helmet({
     directives: {
       ...cspDirectives,
       'connect-src': ["'self'", 'http://localhost:*', 'http://127.0.0.1:*', 'https:'],
+      'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
       'img-src': ["'self'", 'data:', 'https:'],
       'script-src': ["'self'", 'https://cdn.jsdelivr.net'],
+      'style-src': ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
     },
   },
 }));

@@ -79,13 +79,19 @@ async function savePlantToDB(plantName, scientificName, cleanedData, rawData) {
 async function ensureUserRecord(user) {
   if (!user?.uid) return;
 
+  const name = user.name || user.displayName || null;
+  const photoUrl = user.photoURL || user.picture || null;
+
   try {
     await pool.query(
-      `INSERT INTO users (uid, email, name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (uid, email, name, photo_url)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (uid) DO UPDATE
-       SET email = EXCLUDED.email, name = EXCLUDED.name`,
-      [user.uid, user.email || null, user.name || user.displayName || null]
+       SET
+         email = COALESCE(EXCLUDED.email, users.email),
+         name = COALESCE(EXCLUDED.name, users.name),
+         photo_url = COALESCE(EXCLUDED.photo_url, users.photo_url)`,
+      [user.uid, user.email || null, name, photoUrl]
     );
   } catch (err) {
     console.error('[DB ERROR] Failed to ensure user record:', err.message);

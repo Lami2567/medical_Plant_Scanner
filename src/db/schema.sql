@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   uid          TEXT PRIMARY KEY,
   email        TEXT,
   name         TEXT,
+  photo_url    TEXT,
   created_at   TIMESTAMP DEFAULT NOW()
 );
 
