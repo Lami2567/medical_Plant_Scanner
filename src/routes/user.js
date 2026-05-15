@@ -41,15 +41,26 @@ router.get('/history', async (req, res) => {
     );
     
     // Format to match old plant output
-    const history = result.rows.map(row => ({
-      scan_id: row.scan_id,
-      image_hash: row.image_hash,
-      image_url: row.image_url,
-      scanned_at: row.created_at,
-      plant_name: row.plant_name,
-      scientific_name: row.scientific_name,
-      ...row.cleaned_data,
-    }));
+    const history = result.rows.map(row => {
+      const cleanedData = row.cleaned_data || {};
+      const scanImageUrl = row.image_url || null;
+      const profileImageUrl =
+        cleanedData.image_url ||
+        cleanedData.photo_url ||
+        cleanedData.thumbnail_url ||
+        null;
+
+      return {
+        ...cleanedData,
+        scan_id: row.scan_id,
+        image_hash: row.image_hash,
+        scan_image_url: scanImageUrl,
+        image_url: scanImageUrl || profileImageUrl,
+        scanned_at: row.created_at,
+        plant_name: row.plant_name,
+        scientific_name: row.scientific_name,
+      };
+    });
 
     return res.json({ history });
   } catch (error) {
